@@ -1,0 +1,315 @@
+import builtin::strategy.
+import builtin::view.
+
+// Class Declaration
+
+abstract class Coordinates {
+    real x
+    real y
+}
+
+abstract class Pose extends Coordinates {
+    real dirX
+    real dirY
+}
+
+class Lane extends Coordinates {
+    Lane[0..1] forward
+    Lane[0..1] right
+    Lane[0..1] left
+}
+
+class Car extends Pose {
+    Lane[1] on
+    Pose[] observes
+}
+
+class TrafficLight extends Pose {
+    Lane[1..*] controls 
+}
+
+class Crosswalk extends Pose {
+    Lane[1..*] spans 
+}
+
+// Model Creation
+
+!exists(Lane::new).
+!exists(Car::new).
+!exists(TrafficLight::new).
+!exists(Crosswalk::new).
+
+default !forward(*,*).
+default !left(*,*).
+default !right(*,*).
+default !observes(*,*).
+default !controls(*,*).
+default !spans(*,*).
+default !on(*,*).
+
+forward(l11, l21).
+forward(l12, l22).
+
+right(l11, l12).
+right(l21, l22).
+right(l12, l11).
+right(l22, l21).
+
+TrafficLight(tl1).
+controls(tl1, l11).
+
+Crosswalk(cw1).
+spans(cw1, l12).
+
+Car(ego).
+Car(observed).
+
+observes(ego, tl1).
+observes(observed, tl1).
+observes(ego, observed).
+
+?on(ego, l11).
+?on(ego, l21).
+?on(observed, l11).
+?on(observed, l21).
+?on(observed, l22).
+
+// Defining coordinates and angles
+
+dirX(*): -1.0 .. 1.0.
+dirY(*): -1.0 .. 1.0.
+
+dirX(l11): 1.0.
+dirY(l11): 0.0.
+
+dirX(l21): 1.0.
+dirY(l21): 0.0.
+
+dirX(l12): 1.0.
+dirY(l12): 0.0.
+
+dirX(l22): 1.0.
+dirY(l22): 0.0.
+
+x(l11): 10.0..20.0.
+y(l11): 10.0..20.0.
+
+x(l21): 20.0..30.0.
+y(l21): 12.0..15.0.
+
+x(l12): 10.0..20.0.
+y(l12): 15.0..18.0.
+
+x(l22): 20.0..30.0.
+y(l22): 15.0..18.0.
+
+// Decision Rules
+
+decision rule cutHalfX1(p) <->
+    Car(p),
+    upperBound(x(p))-lowerBound(x(p))>=1.0,
+    !hasSmallerIntervalX(p)
+==>
+    x(p):lowerBound(x(p))..
+            (upperBound(x(p))-
+             lowerBound(x(p)))/2.0.
+
+decision rule cutHalfY1(p) <->
+    Car(p),
+    upperBound(y(p))-lowerBound(y(p))>=1.0,
+    !hasSmallerIntervalY(p)
+==>
+    y(p):lowerBound(y(p))..
+            (upperBound(y(p))-
+             lowerBound(y(p)))/2.0.
+
+decision rule cutHalfX2(p) <->
+    Car(p),
+    upperBound(x(p))-lowerBound(x(p))>=1.0,
+    !hasSmallerIntervalX(p)
+==>
+    x(p):(upperBound(x(p))+
+          lowerBound(x(p)))/2.0 ..
+         upperBound(x(p)).
+
+decision rule cutHalfY2(p) <->
+    Car(p),
+    upperBound(y(p))-lowerBound(y(p))>=1.0,
+    !hasSmallerIntervalY(p)
+==>
+    y(p):(upperBound(y(p))+
+          lowerBound(y(p)))/2.0 ..
+         upperBound(y(p)).
+
+// Propagation Rules
+
+propagation rule carOnLaneBounds(c, l) <->
+    Car(c),
+    Lane(l),
+    on(c, l)
+==>
+    x(c):lowerBound(x(l))..upperBound(x(l)),
+    y(c):lowerBound(y(l))..upperBound(y(l)).
+
+propagation rule matchLaneDirection(c, l) <->
+    Car(c),
+    Lane(l),
+    on(c, l)
+==>
+    dirX(c): lowerBound(dirX(l)) .. upperBound(dirX(l)),
+    dirY(c): lowerBound(dirY(l)) .. upperBound(dirY(l)).
+
+propagation rule positionTrafficLight(tl, l) <->
+    TrafficLight(tl),
+    Lane(l),
+    controls(tl, l)
+==>
+    x(tl): upperBound(x(l)) .. upperBound(x(l)) + 1.0,
+    y(tl): lowerBound(y(l)) .. upperBound(y(l)).
+
+propagation rule positionCrosswalk(cw, l) <->
+    Crosswalk(cw),
+    Lane(l),
+    spans(cw, l)
+==>
+    x(cw): upperBound(x(l)) - 2.0 .. upperBound(x(l)),
+    y(cw): lowerBound(y(l)) .. upperBound(y(l)).
+
+propagation rule carIsTooFarLeft(c, l) <->
+    Car(c),
+    Lane(l),
+    upperBound(y(c)) < lowerBound(y(l))
+==>
+    !on(c, l).
+
+propagation rule carIsTooFarForward(c, l) <->
+    Car(c),
+    Lane(l),
+    lowerBound(x(c)) > upperBound(x(l))
+==>
+    !on(c, l).
+
+propagation rule carIsTooFarBehind(c, l) <->
+    Car(c),
+    Lane(l),
+    upperBound(x(c)) < lowerBound(x(l))
+==>
+    !on(c, l).
+
+propagation rule carIsTooFarRight(c, l) <->
+    Car(c),
+    Lane(l),
+    lowerBound(y(c)) > upperBound(y(l))
+==>
+    !on(c, l).
+
+// Concretization Rules
+
+concretization rule setExactX(p) <->
+    Car(p)
+==>
+    x(p):(lowerBound(x(p)) + upperBound(x(p))) / 2.0.
+
+concretization rule setExactY(p) <->
+    Car(p)
+==>
+    y(p):(lowerBound(y(p)) + upperBound(y(p))) / 2.0.
+
+// Shadow Pred
+
+shadow pred hasSmallerIntervalX(c) <->
+    Car(c), 
+    Car(other), 
+    c != other,
+    (upperBound(x(other)) - lowerBound(x(other))) > (upperBound(x(c)) - lowerBound(x(c))).
+
+shadow pred hasSmallerIntervalY(c) <->
+    Car(c), 
+    Car(other), 
+    c != other,
+    (upperBound(y(other)) - lowerBound(y(other))) > (upperBound(y(c)) - lowerBound(y(c))).
+
+// Pred
+
+pred isBehind(obs, target) <->
+    // Dot product is less or equal to 0
+    Car(obs),
+    Pose(target),
+    ((x(target)-x(obs)) * dirX(obs) + (y(target) - y(obs)) * dirY(obs)) <= 0.0.
+
+pred isTooFar(obs, target) <->
+    // Max distance of observance is 100 units
+    Car(obs),
+    Pose(target),
+    ((x(target) - x(obs)) * (x(target) - x(obs)) + 
+     (y(target) - y(obs)) * (y(target) - y(obs))) > 10000.0.
+
+pred isOutsideRightWedge(obs, target) <->
+    // Cross Product <= -(Dot Product)
+    Car(obs),
+    Pose(target),
+    ((y(target) - y(obs)) * dirX(obs) - (x(target) - x(obs)) * dirY(obs)) <=
+    -((x(target) - x(obs)) * dirX(obs) + (y(target) - y(obs)) * dirY(obs)).
+
+pred isOutsideLeftWedge(obs, target) <->
+    // Cross Product >= Dot Product
+    Car(obs),
+    Pose(target),
+    ((y(target) - y(obs)) * dirX(obs) - (x(target) - x(obs)) * dirY(obs)) >=
+    ((x(target) - x(obs)) * dirX(obs) + (y(target) - y(obs)) * dirY(obs)).
+
+// Errors
+
+error pred invalidCrosswalkSpan(cw, l1, l2) <->
+    Crosswalk(cw),
+    Lane(l1), 
+    Lane(l2),
+    l1 != l2,
+    spans(cw, l1), 
+    spans(cw, l2),
+    !right(l1, l2), 
+    !right(l2, l1).
+
+error pred collisionDetected(c1, c2, l) <->
+    Car(c1),
+    Car(c2),
+    c1 != c2,
+    Lane(l),
+    on(c1, l),
+    on(c2, l).
+
+error pred cannotObserveItself(c) <->
+    Car(c),
+    observes(c, c).
+
+error pred cannotObserveBehind(c, p) <->
+    Car(c),
+    Pose(p),
+    observes(c, p),
+    isBehind(c, p).
+
+error pred cannotObserveTooFarLeft(c, p) <->
+    Car(c),
+    Pose(p),
+    observes(c, p),
+    isOutsideLeftWedge(c, p).
+
+error pred cannotObserveTooFarRight(c, p) <->
+    Car(c),
+    Pose(p),
+    observes(c, p),
+    isOutsideRightWedge(c, p).
+
+error pred cannotObserveTooFar(c, p) <->
+    Car(c),
+    Pose(p),
+    observes(c, p),
+    isTooFar(c, p). // Copy paste the formula in here
+
+error pred directionMagnitudeTooSmall(p) <->
+    Pose(p),
+    dirX(p) * dirX(p) + dirY(p) * dirY(p) < 0.999.
+
+error pred directionMagnitudeTooLarge(p) <->
+    Pose(p),
+    dirX(p) * dirX(p) + dirY(p) * dirY(p) > 1.001.
