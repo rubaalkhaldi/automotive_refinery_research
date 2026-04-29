@@ -1,0 +1,35 @@
+{
+  "nodes": [
+    { "id": "n1", "lat": 47.4979, "lon": 19.0402 },
+    { "id": "n2", "lat": 47.4989, "lon": 19.0502 },
+    { "id": "n3", "lat": 47.4976, "lon": 19.0524 },
+    { "id": "n4", "lat": 47.4959, "lon": 19.0452 },
+    { "id": "n5", "lat": 47.4974, "lon": 19.0477 }
+  ],
+  "ways": [
+    {
+      "id": "w1",
+      "name": "Main Street",
+      "highway": "primary",
+      "lanes": 2,
+      "maxspeed": 50,
+      "nodes": ["n1", "n5", "n2"]
+    },
+    {
+      "id": "w2",
+      "name": "Oak Avenue",
+      "highway": "secondary",
+      "lanes": 1,
+      "maxspeed": 30,
+      "nodes": ["n2", "n3", "n4"]
+    },
+    {
+      "id": "w3",
+      "name": "Ring Road",
+      "highway": "primary",
+      "lanes": 2,
+      "maxspeed": 70,
+      "nodes": ["n4", "n5", "n1"]
+    }
+  ]
+}

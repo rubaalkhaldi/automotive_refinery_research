@@ -1,0 +1,5 @@
+source,target,via_junction,junction_degree
+w1,w3,j_n1,2
+w1,w2,j_n2,2
+w2,w3,j_n4,2
+w1,w3,j_n5,2

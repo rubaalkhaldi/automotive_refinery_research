@@ -1,0 +1,4 @@
+id,name,highway,lanes,maxspeed,node_sequence
+w1,Main Street,primary,2,50,"n1,n5,n2"
+w2,Oak Avenue,secondary,1,30,"n2,n3,n4"
+w3,Ring Road,primary,2,70,"n4,n5,n1"

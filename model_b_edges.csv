@@ -1,0 +1,6 @@
+source,target,via_road,road_name,lanes,maxspeed,highway
+j_n1,j_n5,w1,Main Street,2,50,primary
+j_n5,j_n2,w1,Main Street,2,50,primary
+j_n2,j_n4,w2,Oak Avenue,1,30,secondary
+j_n4,j_n5,w3,Ring Road,2,70,primary
+j_n5,j_n1,w3,Ring Road,2,70,primary

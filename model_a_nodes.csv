@@ -1,0 +1,4 @@
+node_id,name,highway,lanes,maxspeed
+w1,Main Street,primary,2,50
+w2,Oak Avenue,secondary,1,30
+w3,Ring Road,primary,2,70

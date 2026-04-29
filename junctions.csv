@@ -1,0 +1,5 @@
+junction_id,osm_node_id,lat,lon,road_ids,degree
+j_n1,n1,47.4979,19.0402,w1;w3,2
+j_n2,n2,47.4989,19.0502,w1;w2,2
+j_n4,n4,47.4959,19.0452,w2;w3,2
+j_n5,n5,47.4974,19.0477,w1;w3,2

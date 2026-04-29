@@ -1,0 +1,51 @@
+// Model A: Roads are nodes, junctions are edges
+
+class Road {
+    string name
+    string highway
+    int lanes
+    int maxspeed
+    TrafficSignKind[] signs
+    Road[1..4] junction opposite junction
+}
+
+enum TrafficSignKind {
+    STOPSIGN, PCROSSING, UTURN
+}
+
+// A junction connects two roads.
+// 'degree' records how many roads meet at that junction.
+// pred junction(road1: Road, road2: Road, via: string, degree: int).
+
+////////////////////////////////////////////////////////////
+// Road instances
+////////////////////////////////////////////////////////////
+Road(w1).
+    name(w1): "Main Street".
+    highway(w1): "primary".
+    lanes(w1): 2.
+    maxspeed(w1): 50.
+
+Road(w2).
+    name(w2): "Oak Avenue".
+    highway(w2): "secondary".
+    lanes(w2): 1.
+    maxspeed(w2): 30.
+
+Road(w3).
+    name(w3): "Ring Road".
+    highway(w3): "primary".
+    lanes(w3): 2.
+    maxspeed(w3): 70.
+
+
+
+////////////////////////////////////////////////////////////
+// Junction edges
+////////////////////////////////////////////////////////////
+junction(w1, w3).junction(w3, w1).
+junction(w1, w2).junction(w2, w1).
+junction(w2, w3).junction(w3, w2).
+junction(w1, w3).junction(w3, w1).
+
+default !junction(*,*).
