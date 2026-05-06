@@ -1,28 +1,23 @@
 """
 02_build_models.py
 ------------------
-Build two graph representations from the cleaned roads/junctions CSVs.
+Build graph CSVs from the cleaned OSM CSVs.
 
-Model A — Roads as Nodes:
-  nodes : roads.csv  (id, name, lanes, maxspeed, highway)
-  edges : for each junction, emit one edge per pair of roads that meet there
-          edge columns: source_road, target_road, via_junction, junction_degree
+Model A is the requested Refinery model:
+  Junction and Road are both model nodes.
+  A Road node connects exactly two Junction nodes.
+  Shape points stay inside the Road as geometry attributes.
 
-Model B — Junctions as Nodes:
-  nodes : junctions.csv  (junction_id, lat, lon, degree)
-  edges : for each road, emit one edge per consecutive junction pair along it
-          edge columns: source_junction, target_junction, via_road,
-                        road_name, lanes, maxspeed, highway
+Model B is kept as the older comparison model:
+  Junctions are nodes and road segments are edges.
 """
 
 import csv
-from itertools import combinations
+import math
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-
-# ── helpers ──────────────────────────────────────────────────────────────────
 
 def read_csv(path: Path) -> list[dict]:
     with open(path) as f:
@@ -34,123 +29,242 @@ def write_csv(rows: list[dict], fieldnames: list[str], path: Path):
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"  Wrote {len(rows)} rows → {path}")
+    print(f"  Wrote {len(rows)} rows -> {path}")
 
 
-# ── Model A ───────────────────────────────────────────────────────────────────
+def parse_sequence(value: str) -> list[str]:
+    return [part.strip() for part in value.split(",") if part.strip()]
 
-def build_model_a(roads: list[dict], junctions: list[dict]):
+
+def distance(a: dict, b: dict) -> float:
+    return math.hypot(float(b["x"]) - float(a["x"]), float(b["y"]) - float(a["y"]))
+
+
+def geometry_for(node_ids: list[str], node_lookup: dict[str, dict]) -> str:
+    return ";".join(
+        f"{float(node_lookup[node_id]['x']):.3f},{float(node_lookup[node_id]['y']):.3f}"
+        for node_id in node_ids
+    )
+
+
+def geometry_length(node_ids: list[str], node_lookup: dict[str, dict]) -> float:
+    return sum(
+        distance(node_lookup[a], node_lookup[b])
+        for a, b in zip(node_ids, node_ids[1:])
+    )
+
+
+def coordinate_interval(node_ids: list[str], node_lookup: dict[str, dict], axis: str, width: float) -> str:
+    values = [float(node_lookup[node_id][axis]) for node_id in node_ids]
+    half_width = width / 2
+    return f"{min(values) - half_width:.3f}..{max(values) + half_width:.3f}"
+
+
+def split_roads_between_junctions(
+    roads: list[dict],
+    junctions: list[dict],
+    node_lookup: dict[str, dict],
+) -> tuple[list[dict], list[dict], list[dict]]:
     """
-    Nodes = roads.
-    Edges = pairs of roads that share a junction.
-    An edge is undirected so we emit (road_a, road_b) with road_a < road_b
-    to avoid duplicates.
-    """
-    # nodes: just the road attributes we care about
-    node_rows = [
-        {
-            "node_id": r["id"],
-            "name": r["name"],
-            "highway": r["highway"],
-            "lanes": r["lanes"],
-            "maxspeed": r["maxspeed"],
-        }
-        for r in roads
-    ]
+    Split each OSM way at junction/end nodes.
 
-    # edges: for each junction, take every pair of roads meeting there
+    The returned road rows are Road model nodes. Intermediate OSM points remain
+    encoded in geometry, so they do not become main graph nodes.
+    """
+    junction_node_ids = {j["osm_node_id"] for j in junctions}
+    junction_lookup = {j["osm_node_id"]: j for j in junctions}
+    incident_counts = {j["junction_id"]: 0 for j in junctions}
+    road_rows = []
     edge_rows = []
-    seen = set()
-    for junc in junctions:
-        road_ids = sorted(junc["road_ids"].split(";"))
-        for r1, r2 in combinations(road_ids, 2):
-            key = (r1, r2, junc["junction_id"])
-            if key not in seen:
-                seen.add(key)
-                edge_rows.append({
-                    "source": r1,
-                    "target": r2,
-                    "via_junction": junc["junction_id"],
-                    "junction_degree": junc["degree"],
-                })
 
-    write_csv(node_rows, ["node_id", "name", "highway", "lanes", "maxspeed"],
-              DATA_DIR / "model_a_nodes.csv")
-    write_csv(edge_rows, ["source", "target", "via_junction", "junction_degree"],
-              DATA_DIR / "model_a_edges.csv")
+    for road in roads:
+        osm_nodes = parse_sequence(road["node_sequence"])
+        split_indexes = [
+            index for index, node_id in enumerate(osm_nodes)
+            if node_id in junction_node_ids
+        ]
 
+        for segment_index, (start_i, end_i) in enumerate(zip(split_indexes, split_indexes[1:]), start=1):
+            segment_nodes = osm_nodes[start_i:end_i + 1]
+            if len(segment_nodes) < 2:
+                continue
 
-# ── Model B ───────────────────────────────────────────────────────────────────
+            start_junction = junction_lookup[segment_nodes[0]]["junction_id"]
+            end_junction = junction_lookup[segment_nodes[-1]]["junction_id"]
+            road_id = f"{road['id']}_s{segment_index}"
+            length = geometry_length(segment_nodes, node_lookup)
+            width = float(road["width"])
 
-def build_model_b(roads: list[dict], junctions: list[dict]):
-    """
-    Nodes = junctions.
-    Edges = roads that connect two junctions.
+            road_rows.append({
+                "node_id": road_id,
+                "original_way_id": road["id"],
+                "name": road["name"],
+                "highway": road["highway"],
+                "lanes": road["lanes"],
+                "maxspeed": road["maxspeed"],
+                "width": f"{width:.3f}",
+                "start_junction": start_junction,
+                "end_junction": end_junction,
+                "length": f"{length:.3f}",
+                "rx": coordinate_interval(segment_nodes, node_lookup, "x", width),
+                "ry": coordinate_interval(segment_nodes, node_lookup, "y", width),
+                "point_count": len(segment_nodes),
+                "geometry": geometry_for(segment_nodes, node_lookup),
+            })
+            edge_rows.append({"source": road_id, "target": start_junction, "kind": "startsAt"})
+            edge_rows.append({"source": road_id, "target": end_junction, "kind": "endsAt"})
+            incident_counts[start_junction] += 1
+            incident_counts[end_junction] += 1
 
-    For each road we look at its ordered node sequence and find which nodes
-    are junctions.  Each consecutive pair of junctions along the road
-    becomes a directed edge (preserving road direction).
-    """
-    # Build lookup: osm_node_id → junction_id
-    node_to_junc = {j["osm_node_id"]: j["junction_id"] for j in junctions}
-
-    # nodes
-    node_rows = [
-        {
+    junction_rows = []
+    for j in junctions:
+        junction_rows.append({
             "node_id": j["junction_id"],
             "osm_node_id": j["osm_node_id"],
             "lat": j["lat"],
             "lon": j["lon"],
-            "degree": j["degree"],
-        }
+            "x": j["x"],
+            "y": j["y"],
+            "degree": incident_counts[j["junction_id"]],
+        })
+
+    return junction_rows, road_rows, edge_rows
+
+
+def validate_model_a(junctions: list[dict], roads: list[dict], edges: list[dict]):
+    junction_ids = {j["node_id"] for j in junctions}
+    road_ids = {r["node_id"] for r in roads}
+    relation_counts = {road_id: 0 for road_id in road_ids}
+    degree_counts = {junction_id: 0 for junction_id in junction_ids}
+
+    for edge in edges:
+        road_id = edge["source"]
+        junction_id = edge["target"]
+        if road_id not in road_ids:
+            raise ValueError(f"Unknown road in edge: {road_id}")
+        if junction_id not in junction_ids:
+            raise ValueError(f"Unknown junction in edge: {junction_id}")
+        if edge["kind"] not in {"startsAt", "endsAt"}:
+            raise ValueError(f"Unknown edge kind: {edge['kind']}")
+        relation_counts[road_id] += 1
+        degree_counts[junction_id] += 1
+
+    bad_roads = [road_id for road_id, count in relation_counts.items() if count != 2]
+    if bad_roads:
+        raise ValueError(f"Roads without exactly two junction relations: {bad_roads}")
+
+    bad_degrees = [
+        (j["node_id"], j["degree"], degree_counts[j["node_id"]])
         for j in junctions
+        if int(j["degree"]) != degree_counts[j["node_id"]]
     ]
+    if bad_degrees:
+        raise ValueError(f"Junction degree mismatch: {bad_degrees}")
 
-    # edges
-    edge_rows = []
-    road_lookup = {r["id"]: r for r in roads}
 
-    for road in roads:
-        osm_nodes = road["node_sequence"].split(",")
-        # collect only the nodes that are junctions, in order
-        junc_sequence = [
-            node_to_junc[n] for n in osm_nodes if n in node_to_junc
-        ]
-        # consecutive pairs → edges
-        for i in range(len(junc_sequence) - 1):
-            src = junc_sequence[i]
-            tgt = junc_sequence[i + 1]
-            edge_rows.append({
-                "source": src,
-                "target": tgt,
-                "via_road": road["id"],
-                "road_name": road["name"],
-                "lanes": road["lanes"],
-                "maxspeed": road["maxspeed"],
-                "highway": road["highway"],
-            })
+def build_model_a(roads: list[dict], junctions: list[dict], nodes: list[dict]):
+    """Nodes = Junctions + Roads. Edges = startsAt/endsAt relations."""
+    node_lookup = {node["osm_node_id"]: node for node in nodes}
+    junction_rows, road_rows, edge_rows = split_roads_between_junctions(
+        roads,
+        junctions,
+        node_lookup,
+    )
+    validate_model_a(junction_rows, road_rows, edge_rows)
+    node_rows = (
+        [{"node_id": j["node_id"], "kind": "Junction"} for j in junction_rows]
+        + [{"node_id": r["node_id"], "kind": "Road"} for r in road_rows]
+    )
 
-    write_csv(node_rows, ["node_id", "osm_node_id", "lat", "lon", "degree"],
-              DATA_DIR / "model_b_nodes.csv")
+    write_csv(
+        node_rows,
+        ["node_id", "kind"],
+        DATA_DIR / "model_a_nodes.csv",
+    )
+    write_csv(
+        junction_rows,
+        ["node_id", "osm_node_id", "lat", "lon", "x", "y", "degree"],
+        DATA_DIR / "model_a_junctions.csv",
+    )
+    write_csv(
+        road_rows,
+        [
+            "node_id",
+            "original_way_id",
+            "name",
+            "highway",
+            "lanes",
+            "maxspeed",
+            "width",
+            "start_junction",
+            "end_junction",
+            "length",
+            "rx",
+            "ry",
+            "point_count",
+            "geometry",
+        ],
+        DATA_DIR / "model_a_roads.csv",
+    )
     write_csv(
         edge_rows,
-        ["source", "target", "via_road", "road_name", "lanes", "maxspeed", "highway"],
+        ["source", "target", "kind"],
+        DATA_DIR / "model_a_edges.csv",
+    )
+
+
+def build_model_b(roads: list[dict], junctions: list[dict], nodes: list[dict]):
+    """
+    Nodes = junctions.
+    Edges = road parts that connect consecutive junctions.
+    """
+    node_lookup = {node["osm_node_id"]: node for node in nodes}
+    junction_rows, road_rows, _ = split_roads_between_junctions(
+        roads,
+        junctions,
+        node_lookup,
+    )
+
+    edge_rows = []
+    for road in road_rows:
+        edge_rows.append({
+            "source": road["start_junction"],
+            "target": road["end_junction"],
+            "via_road": road["node_id"],
+            "road_name": road["name"],
+            "lanes": road["lanes"],
+            "maxspeed": road["maxspeed"],
+            "width": road["width"],
+            "highway": road["highway"],
+            "length": road["length"],
+            "rx": road["rx"],
+            "ry": road["ry"],
+            "geometry": road["geometry"],
+        })
+
+    write_csv(
+        junction_rows,
+        ["node_id", "osm_node_id", "lat", "lon", "x", "y", "degree"],
+        DATA_DIR / "model_b_nodes.csv",
+    )
+    write_csv(
+        edge_rows,
+        ["source", "target", "via_road", "road_name", "lanes", "maxspeed", "width", "highway", "length", "rx", "ry", "geometry"],
         DATA_DIR / "model_b_edges.csv",
     )
 
 
-# ── main ──────────────────────────────────────────────────────────────────────
-
 def main():
     print("=== Step 2: Build Graph Models ===")
+    nodes = read_csv(DATA_DIR / "nodes.csv")
     roads = read_csv(DATA_DIR / "roads.csv")
     junctions = read_csv(DATA_DIR / "junctions.csv")
 
-    print("\n-- Model A: Roads as nodes --")
-    build_model_a(roads, junctions)
+    print("\n-- Model A: Junctions and roads as nodes --")
+    build_model_a(roads, junctions, nodes)
 
     print("\n-- Model B: Junctions as nodes --")
-    build_model_b(roads, junctions)
+    build_model_b(roads, junctions, nodes)
 
 
 if __name__ == "__main__":

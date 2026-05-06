@@ -1,51 +1,137 @@
-// Model A: Roads are nodes, junctions are edges
+// Model A: Junctions and roads are both nodes
+// Roads connect to junctions through startsAt/endsAt relations.
+// Road geometry is stored as an encoded x,y point list on the Road.
+
+class Junction {
+    real x
+    real y
+    int degree
+    Road[] startsRoad opposite startsAt
+    Road[] endsRoad opposite endsAt
+}
 
 class Road {
+    string originalWayId
     string name
     string highway
     int lanes
     int maxspeed
-    TrafficSignKind[] signs
-    Road[1..4] junction opposite junction
+    real length
+    real rx
+    real ry
+    int pointCount
+    string geometry
+    Junction[1] startsAt opposite startsRoad
+    Junction[1] endsAt opposite endsRoad
 }
 
 enum TrafficSignKind {
     STOPSIGN, PCROSSING, UTURN
 }
 
-// A junction connects two roads.
-// 'degree' records how many roads meet at that junction.
-// pred junction(road1: Road, road2: Road, via: string, degree: int).
+////////////////////////////////////////////////////////////
+// Junction instances
+////////////////////////////////////////////////////////////
+Junction(j_n1).
+    x(j_n1): -521.959.
+    y(j_n1): 40.075.
+    degree(j_n1): 2.
+
+Junction(j_n2).
+    x(j_n2): 230.143.
+    y(j_n2): 151.395.
+    degree(j_n2): 2.
+
+Junction(j_n4).
+    x(j_n4): -145.908.
+    y(j_n4): -182.565.
+    degree(j_n4): 2.
+
+Junction(j_n5).
+    x(j_n5): 42.118.
+    y(j_n5): -15.585.
+    degree(j_n5): 4.
+
+
 
 ////////////////////////////////////////////////////////////
 // Road instances
 ////////////////////////////////////////////////////////////
-Road(w1).
-    name(w1): "Main Street".
-    highway(w1): "primary".
-    lanes(w1): 2.
-    maxspeed(w1): 50.
+Road(w1_s1).
+    originalWayId(w1_s1): "w1".
+    name(w1_s1): "Main Street".
+    highway(w1_s1): "primary".
+    lanes(w1_s1): 2.
+    maxspeed(w1_s1): 50.
+    length(w1_s1): 566.816.
+    rx(w1_s1): -525.459..45.618.
+    ry(w1_s1): -19.085..43.575.
+    pointCount(w1_s1): 2.
+    geometry(w1_s1): "-521.959,40.075;42.118,-15.585".
 
-Road(w2).
-    name(w2): "Oak Avenue".
-    highway(w2): "secondary".
-    lanes(w2): 1.
-    maxspeed(w2): 30.
+Road(w1_s2).
+    originalWayId(w1_s2): "w1".
+    name(w1_s2): "Main Street".
+    highway(w1_s2): "primary".
+    lanes(w1_s2): 2.
+    maxspeed(w1_s2): 50.
+    length(w1_s2): 251.467.
+    rx(w1_s2): 38.618..233.643.
+    ry(w1_s2): -19.085..154.895.
+    pointCount(w1_s2): 2.
+    geometry(w1_s2): "42.118,-15.585;230.143,151.395".
 
-Road(w3).
-    name(w3): "Ring Road".
-    highway(w3): "primary".
-    lanes(w3): 2.
-    maxspeed(w3): 70.
+Road(w2_s1).
+    originalWayId(w2_s1): "w2".
+    name(w2_s1): "Oak Avenue".
+    highway(w2_s1): "secondary".
+    lanes(w2_s1): 1.
+    maxspeed(w2_s1): 30.
+    length(w2_s1): 793.449.
+    rx(w2_s1): -147.658..397.356.
+    ry(w2_s1): -184.315..153.145.
+    pointCount(w2_s1): 3.
+    geometry(w2_s1): "230.143,151.395;395.606,6.679;-145.908,-182.565".
+
+Road(w3_s1).
+    originalWayId(w3_s1): "w3".
+    name(w3_s1): "Ring Road".
+    highway(w3_s1): "primary".
+    lanes(w3_s1): 2.
+    maxspeed(w3_s1): 70.
+    length(w3_s1): 251.468.
+    rx(w3_s1): -149.408..45.618.
+    ry(w3_s1): -186.065..-12.085.
+    pointCount(w3_s1): 2.
+    geometry(w3_s1): "-145.908,-182.565;42.118,-15.585".
+
+Road(w3_s2).
+    originalWayId(w3_s2): "w3".
+    name(w3_s2): "Ring Road".
+    highway(w3_s2): "primary".
+    lanes(w3_s2): 2.
+    maxspeed(w3_s2): 70.
+    length(w3_s2): 566.816.
+    rx(w3_s2): -525.459..45.618.
+    ry(w3_s2): -19.085..43.575.
+    pointCount(w3_s2): 2.
+    geometry(w3_s2): "42.118,-15.585;-521.959,40.075".
 
 
 
 ////////////////////////////////////////////////////////////
-// Junction edges
+// Road-junction relations
 ////////////////////////////////////////////////////////////
-junction(w1, w3).junction(w3, w1).
-junction(w1, w2).junction(w2, w1).
-junction(w2, w3).junction(w3, w2).
-junction(w1, w3).junction(w3, w1).
+startsAt(w1_s1, j_n1).
+endsAt(w1_s1, j_n5).
+startsAt(w1_s2, j_n5).
+endsAt(w1_s2, j_n2).
+startsAt(w2_s1, j_n2).
+endsAt(w2_s1, j_n4).
+startsAt(w3_s1, j_n4).
+endsAt(w3_s1, j_n5).
+startsAt(w3_s2, j_n5).
+endsAt(w3_s2, j_n1).
 
-default !junction(*,*).
+default !startsAt(*,*).
+default !endsAt(*,*).

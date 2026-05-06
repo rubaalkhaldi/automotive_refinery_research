@@ -1,4 +1,10 @@
-node_id,name,highway,lanes,maxspeed
-w1,Main Street,primary,2,50
-w2,Oak Avenue,secondary,1,30
-w3,Ring Road,primary,2,70
+node_id,kind
+j_n1,Junction
+j_n2,Junction
+j_n4,Junction
+j_n5,Junction
+w1_s1,Road
+w1_s2,Road
+w2_s1,Road
+w3_s1,Road
+w3_s2,Road
