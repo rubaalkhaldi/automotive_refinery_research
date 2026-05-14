@@ -125,4 +125,14 @@ def convert_model_a(junctions: list[dict], roads: list[dict], edges: list[dict])
 def main():
     print("=== Step 4: Convert to Refinery ===")
 
-    a_j
+    a_junctions = read_csv(DATA_DIR / "model_a_junctions.csv")
+    a_roads = read_csv(DATA_DIR / "model_a_roads.csv")
+    a_edges = read_csv(DATA_DIR / "model_a_edges.csv")
+    a_text = convert_model_a(a_junctions, a_roads, a_edges)
+    out_a = OUT_DIR / "model_a_roads_as_nodes.refinery"
+    out_a.write_text(a_text)
+    print(f"  Wrote -> {out_a}")
+
+
+if __name__ == "__main__":
+    main()
