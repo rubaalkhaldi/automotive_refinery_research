@@ -3,12 +3,17 @@
 ---------------
 Parse the synthetic OSM-like JSON, detect junctions (nodes shared by 2+ ways or
 road endpoints), convert GPS coordinates into local x/y meters,
-and write two clean CSVs:
-  - data/nodes.csv       : one row per OSM node, with lat/lon and local x/y
-  - data/roads.csv       : one row per road
-  - data/junctions.csv   : one row per junction, with participating road IDs
+and write a reusable cleaned map cache:
+  - cache_nodes.csv       : one row per OSM node, with lat/lon and local x/y
+  - cache_roads.csv       : one row per road
+  - cache_junctions.csv   : one row per junction, with participating road IDs
+
+For backward compatibility, the same cleaned full area is also written to
+nodes.csv, roads.csv, and junctions.csv. A later scenario extraction step can
+overwrite those active files with a smaller GPS/bbox selection.
 """
 
+import argparse
 import json
 import csv
 import math
@@ -163,8 +168,9 @@ def write_junctions_csv(
 
 
 def main():
-    print("=== Step 1: Parse & Clean OSM ===")
-    osm = load_osm(DATA_DIR / "raw_osm.json")
+    args = parse_args()
+    print("=== Step 1: Parse & Cache OSM ===")
+    osm = load_osm(Path(args.input))
 
     # Index nodes by id for coordinate lookup
     node_coords = project_to_local_xy(osm["nodes"])
@@ -175,7 +181,13 @@ def main():
     # Detect junctions
     junctions = detect_junctions(osm["ways"])
 
-    # Write outputs
+    # Write reusable full-area cache outputs.
+    write_nodes_csv(node_coords, DATA_DIR / "cache_nodes.csv")
+    write_roads_csv(roads, DATA_DIR / "cache_roads.csv")
+    write_junctions_csv(junctions, node_coords, DATA_DIR / "cache_junctions.csv")
+
+    # Keep the existing pipeline behavior: full area is the active scenario
+    # until 02_extract_scenario.py writes a smaller active selection.
     write_nodes_csv(node_coords, DATA_DIR / "nodes.csv")
     write_roads_csv(roads, DATA_DIR / "roads.csv")
     write_junctions_csv(junctions, node_coords, DATA_DIR / "junctions.csv")
@@ -183,6 +195,12 @@ def main():
     print("\nSummary:")
     print(f"  Roads    : {len(roads)}")
     print(f"  Junctions: {len(junctions)}")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default=str(DATA_DIR / "raw_osm.json"))
+    return parser.parse_args()
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """
 03_to_refinery.py
 -----------------
-Convert graph model CSVs into Refinery (.refinery) files.
+Convert the generated graph model CSVs into a Refinery (.refinery) file.
 """
 
 import csv
@@ -67,9 +67,12 @@ def convert_model_a(junctions: list[dict], roads: list[dict], edges: list[dict])
         "    Junction[1] endsAt opposite endsRoad",
         "}",
         "",
-        "enum TrafficSignKind {",
-        "    STOPSIGN, PCROSSING, UTURN",
+        "abstract class TrafficSign {",
+        "    Road[1] on",
         "}",
+        "",
+        "class UTurnSign extends TrafficSign.",
+        "class PCrossingSign extends TrafficSign.",
     ]
     sections.append("\n".join(schema))
 
@@ -108,76 +111,18 @@ def convert_model_a(junctions: list[dict], roads: list[dict], edges: list[dict])
     relation_lines.append("")
     relation_lines.append("default !startsAt(*,*).")
     relation_lines.append("default !endsAt(*,*).")
+    relation_lines.append("")
+    relation_lines.append("error pred diffKindOfSign(x, y, r) <->")
+    relation_lines.append("    on(x, r),")
+    relation_lines.append("    on(y, r),")
+    relation_lines.append("    UTurnSign(x),")
+    relation_lines.append("    PCrossingSign(y).")
     sections.append(block("Road-junction relations", relation_lines))
 
     return "\n".join(sections)
 
 
-def convert_model_b(nodes: list[dict], edges: list[dict]) -> str:
-    """Convert the older junction-node comparison model."""
-    sections: list[str] = []
-    schema = [
-        "// Model B: Junctions are nodes, roads are edges",
-        "",
-        "class Junction {",
-        "    real x",
-        "    real y",
-        "    int degree",
-        "    Junction[1..4] road opposite road",
-        "}",
-        "",
-        "// A road part connects two junctions.",
-        "// The road geometry is preserved as comments next to the facts.",
-    ]
-    sections.append("\n".join(schema))
-
-    junc_lines = []
-    for n in nodes:
-        jid = safe_id(n["node_id"])
-        junc_lines.append(f"Junction({jid}).")
-        junc_lines.append(f"    x({jid}): {n['x']}.")
-        junc_lines.append(f"    y({jid}): {n['y']}.")
-        junc_lines.append(f"    degree({jid}): {n['degree']}.")
-        junc_lines.append("")
-    sections.append(block("Junction instances", junc_lines))
-
-    edge_lines = []
-    for e in edges:
-        src = safe_id(e["source"])
-        tgt = safe_id(e["target"])
-        edge_lines.append(
-            f"// {escape_string(e['via_road'])}: "
-            f"name=\"{escape_string(e['road_name'])}\", "
-            f"lanes={e['lanes']}, maxspeed={e['maxspeed']}, "
-            f"highway=\"{escape_string(e['highway'])}\", "
-            f"length={e['length']}, geometry=\"{escape_string(e['geometry'])}\"."
-        )
-        edge_lines.append(f"road({src}, {tgt}).road({tgt}, {src}).")
-    edge_lines.append("")
-    edge_lines.append("default !road(*,*).")
-    sections.append(block("Road edges", edge_lines))
-
-    return "\n".join(sections)
-
-
 def main():
-    print("=== Step 3: Convert to Refinery ===")
+    print("=== Step 4: Convert to Refinery ===")
 
-    a_junctions = read_csv(DATA_DIR / "model_a_junctions.csv")
-    a_roads = read_csv(DATA_DIR / "model_a_roads.csv")
-    a_edges = read_csv(DATA_DIR / "model_a_edges.csv")
-    a_text = convert_model_a(a_junctions, a_roads, a_edges)
-    out_a = OUT_DIR / "model_a_roads_as_nodes.refinery"
-    out_a.write_text(a_text)
-    print(f"  Wrote -> {out_a}")
-
-    b_nodes = read_csv(DATA_DIR / "model_b_nodes.csv")
-    b_edges = read_csv(DATA_DIR / "model_b_edges.csv")
-    b_text = convert_model_b(b_nodes, b_edges)
-    out_b = OUT_DIR / "model_b_junctions_as_nodes.refinery"
-    out_b.write_text(b_text)
-    print(f"  Wrote -> {out_b}")
-
-
-if __name__ == "__main__":
-    main()
+    a_j

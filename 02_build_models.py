@@ -3,13 +3,10 @@
 ------------------
 Build graph CSVs from the cleaned OSM CSVs.
 
-Model A is the requested Refinery model:
+The generated Refinery model uses Junction and Road as nodes:
   Junction and Road are both model nodes.
   A Road node connects exactly two Junction nodes.
   Shape points stay inside the Road as geometry attributes.
-
-Model B is kept as the older comparison model:
-  Junctions are nodes and road segments are edges.
 """
 
 import csv
@@ -213,58 +210,14 @@ def build_model_a(roads: list[dict], junctions: list[dict], nodes: list[dict]):
     )
 
 
-def build_model_b(roads: list[dict], junctions: list[dict], nodes: list[dict]):
-    """
-    Nodes = junctions.
-    Edges = road parts that connect consecutive junctions.
-    """
-    node_lookup = {node["osm_node_id"]: node for node in nodes}
-    junction_rows, road_rows, _ = split_roads_between_junctions(
-        roads,
-        junctions,
-        node_lookup,
-    )
-
-    edge_rows = []
-    for road in road_rows:
-        edge_rows.append({
-            "source": road["start_junction"],
-            "target": road["end_junction"],
-            "via_road": road["node_id"],
-            "road_name": road["name"],
-            "lanes": road["lanes"],
-            "maxspeed": road["maxspeed"],
-            "width": road["width"],
-            "highway": road["highway"],
-            "length": road["length"],
-            "rx": road["rx"],
-            "ry": road["ry"],
-            "geometry": road["geometry"],
-        })
-
-    write_csv(
-        junction_rows,
-        ["node_id", "osm_node_id", "lat", "lon", "x", "y", "degree"],
-        DATA_DIR / "model_b_nodes.csv",
-    )
-    write_csv(
-        edge_rows,
-        ["source", "target", "via_road", "road_name", "lanes", "maxspeed", "width", "highway", "length", "rx", "ry", "geometry"],
-        DATA_DIR / "model_b_edges.csv",
-    )
-
-
 def main():
-    print("=== Step 2: Build Graph Models ===")
+    print("=== Step 3: Build Graph Model ===")
     nodes = read_csv(DATA_DIR / "nodes.csv")
     roads = read_csv(DATA_DIR / "roads.csv")
     junctions = read_csv(DATA_DIR / "junctions.csv")
 
-    print("\n-- Model A: Junctions and roads as nodes --")
+    print("\n-- Junctions and roads as nodes --")
     build_model_a(roads, junctions, nodes)
-
-    print("\n-- Model B: Junctions as nodes --")
-    build_model_b(roads, junctions, nodes)
 
 
 if __name__ == "__main__":

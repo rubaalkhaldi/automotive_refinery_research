@@ -25,9 +25,12 @@ class Road {
     Junction[1] endsAt opposite endsRoad
 }
 
-enum TrafficSignKind {
-    STOPSIGN, PCROSSING, UTURN
+abstract class TrafficSign {
+    Road[1] on
 }
+
+class UTurnSign extends TrafficSign.
+class PCrossingSign extends TrafficSign.
 
 ////////////////////////////////////////////////////////////
 // Junction instances
@@ -40,12 +43,12 @@ Junction(j_n1).
 Junction(j_n2).
     x(j_n2): 230.143.
     y(j_n2): 151.395.
-    degree(j_n2): 2.
+    degree(j_n2): 1.
 
 Junction(j_n4).
     x(j_n4): -145.908.
     y(j_n4): -182.565.
-    degree(j_n4): 2.
+    degree(j_n4): 1.
 
 Junction(j_n5).
     x(j_n5): 42.118.
@@ -81,18 +84,6 @@ Road(w1_s2).
     pointCount(w1_s2): 2.
     geometry(w1_s2): "42.118,-15.585;230.143,151.395".
 
-Road(w2_s1).
-    originalWayId(w2_s1): "w2".
-    name(w2_s1): "Oak Avenue".
-    highway(w2_s1): "secondary".
-    lanes(w2_s1): 1.
-    maxspeed(w2_s1): 30.
-    length(w2_s1): 793.449.
-    rx(w2_s1): -147.658..397.356.
-    ry(w2_s1): -184.315..153.145.
-    pointCount(w2_s1): 3.
-    geometry(w2_s1): "230.143,151.395;395.606,6.679;-145.908,-182.565".
-
 Road(w3_s1).
     originalWayId(w3_s1): "w3".
     name(w3_s1): "Ring Road".
@@ -126,8 +117,6 @@ startsAt(w1_s1, j_n1).
 endsAt(w1_s1, j_n5).
 startsAt(w1_s2, j_n5).
 endsAt(w1_s2, j_n2).
-startsAt(w2_s1, j_n2).
-endsAt(w2_s1, j_n4).
 startsAt(w3_s1, j_n4).
 endsAt(w3_s1, j_n5).
 startsAt(w3_s2, j_n5).
@@ -135,3 +124,9 @@ endsAt(w3_s2, j_n1).
 
 default !startsAt(*,*).
 default !endsAt(*,*).
+
+error pred diffKindOfSign(x, y, r) <->
+    on(x, r),
+    on(y, r),
+    UTurnSign(x),
+    PCrossingSign(y).
